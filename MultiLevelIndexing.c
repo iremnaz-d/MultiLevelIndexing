@@ -1,6 +1,10 @@
 #include<stdio.h>
 #include<json-c/json.h>
 #include <stdbool.h>
+#include <string.h>
+
+#define HEAP_MAX 4
+
 
 #pragma region Structs
 typedef struct _Product_Info{ //product object
@@ -44,27 +48,118 @@ typedef struct _Product_Info{ //product object
     char country[16];
     char country_code[4];
     City cities[32];
+    int self_index;
   }Country;
+
+  struct {
+    int self_index;
+    City city;
+    int next_city_index;
+    int product_index;
+  }City_Index;
   #pragma endregion
+
+#pragma region Heap
+
+  typedef struct{
+    Country data;
+  } Node;
+
+  void heapify(Node *heap[]){ 
+    int leftChild = 0, rightChild = 0; bool isRightChild = true;
+    for (int i = 0; i < HEAP_MAX; i++){
+      if(i == 0){leftChild = 1; rightChild = 2;}
+      else{leftChild = 2*i; rightChild = 2*i+1;}
+
+      if(isRightChild){
+        isRightChild = reheap(*heap, i, rightChild);
+      }
+      else{
+        isRightChild = !reheap(*heap,i,leftChild);
+      }
+    }
+  }
+
+  bool reheap(Node *heap[], int indexParent, int indexChild){ //bu metot sadece verilen indexleri karşılaştırıp gerekirse yer değiştirir
+    bool flag = false;
+    if(strcmp((*heap[indexParent]).data.country, (*heap[indexChild]).data.country) > 0){
+      Node temp = *heap[indexParent];
+      *heap[indexParent] = *heap[indexChild];
+      *heap[indexChild] = temp;
+      flag = true;
+    }
+    return flag;
+  }
+
+  void insertToHeap(Node *heap[], Node insertNode){ //heapin 0. nodeuna insert yapar
+    *heap[0] = insertNode;
+    heapify(*heap);
+  }
+
+ #pragma endregion
+
+   int ReplacementSelectionSort(Country countries[], char sortWhat [], int country_number){
+
+    Node *heap[HEAP_MAX]; Node *list[HEAP_MAX]; //heap ve list
+    Node inputNode, outputNode; //country sort için input ve output
+    Country *countriesOrdered[country_number];
+    
+
+    if(strcmp(sortWhat, "country") == 0){ //countrynin sortu her an silebilirim bok gibi yazdım
+      for (int i = 0; i < country_number; i++){
+      Node insertNode;
+      if(i <= HEAP_MAX){ //önce heapin içi doldurulur
+        insertNode.data = countries[i];
+        insertToHeap(*heap,insertNode);
+      }
+      else{ //heap doluysa
+        inputNode.data = countries[i];
+      if(strcmp(inputNode.data.country,outputNode.data.country) > 0){ //input > output
+        outputNode = *heap[0];
+        insertToHeap(*heap,insertNode);
+        for (int j = 0; j < country_number; j++){ //countryOrdereda ekleme yapılır
+          if(countriesOrdered[j] != NULL){
+            countriesOrdered[j] = outputNode.data.country;
+          }
+        }
+      }
+      else{ //input < output
+        insertToHeap(*heap, inputNode);
+      }
+      } 
+    }
+    int try = 0; int heapIndex = 0;
+    while(countriesOrdered[try] != NULL){ //heapte son kalanlar countriesOrdereda atılır
+      for (int i = 0; i < HEAP_MAX; i++){
+        *countriesOrdered[try] = (*heap[i]).data;
+      }
+    }
+  }
+
+
+
+
+  }
 
 
 int main(int argc, char* argv){
 
+  #pragma region JsonParse
 
-  FILE *jsonFile = fopen("Assignment-2.json", "r");
   FILE *datFile = fopen("Binary.dat", "wb");
 
-  struct json_object *parsed_json = json_object_from_file(jsonFile);
+  struct json_object *parsed_json = json_object_from_file("Assignment -2.json");
   int country_number = json_object_array_length(parsed_json);
+  Country countriesUnordered [country_number];
 
   for (int i = 0; i < country_number; i++){ //country döngüsü
     Country curCountry;
     struct json_object *country_obj = json_object_array_get_idx(parsed_json,i); //i inci countryi alır
     struct json_object *country, *country_code, *cities; //countrynin içindekiler
 
-    json_object_object_get_ex(country_obj, "country", country); 
-    json_object_object_get_ex(country_obj, "country_code", country_code);
-    json_object_object_get_ex(country_obj,"cities",cities);
+    json_object_object_get_ex(country_obj, "country", &country); 
+    json_object_object_get_ex(country_obj, "country_code", &country_code);
+    json_object_object_get_ex(country_obj,"cities", &cities);
 
     strcpy(curCountry.country,json_object_get_string(country));
     strcpy(curCountry.country_code, json_object_get_string(country_code));
@@ -75,20 +170,60 @@ int main(int argc, char* argv){
       struct json_object *city_obj = json_object_array_get_idx(cities,j);
       struct json_object *city_name, *meta,*population,*region, *products;
 
-      json_object_object_get_ex(city_obj,"city_name", city_name);
-      json_object_object_get_ex(city_obj, "meta", meta);
-      json_object_object_get_ex(meta,"population", population);
-      json_object_object_get_ex(meta,"region",region);
+      json_object_object_get_ex(city_obj,"city_name", &city_name);
+      json_object_object_get_ex(city_obj, "meta", &meta);
+      json_object_object_get_ex(meta,"population", &population);
+      json_object_object_get_ex(meta,"region", &region);
+      json_object_object_get_ex(city_obj,"products", &products);
 
       strcpy(curCity.city_name, json_object_get_string(city_name));
       strcpy(curCity.meta.region, json_object_get_string(region));
       curCity.meta.population = json_object_get_int64(population);
 
       //city bitti product yapcan şimdi. sonrasında countrye cityi, citye productı dahil etmeyi unutma
+      int product_number = json_object_array_length(products);
+      for (int k = 0; k < product_number; k++){
+        Product curProduct;
+        struct json_object *product_obj = json_object_array_get_idx(products,k);
+        struct json_object *product_id, *product_info, *name, *brand, *category, *pricing, *price, *currency, *inventory, *stock, *warehouse, *isbn, *description, *extra;
 
+        json_object_object_get_ex(product_obj,"product_id", &product_id);
+        json_object_object_get_ex(product_obj,"product_info", &product_info);
+        json_object_object_get_ex(product_info, "name", &name);
+        json_object_object_get_ex(product_info, "brand", &brand);
+        json_object_object_get_ex(product_info, "category", &category);
+        json_object_object_get_ex(product_obj,"pricing", &pricing);
+        json_object_object_get_ex(pricing, "price", &price);
+        json_object_object_get_ex(pricing, "currency", &currency);
+        json_object_object_get_ex(product_obj,"inventory", &inventory);
+        json_object_object_get_ex(inventory, "stock", &stock);
+        json_object_object_get_ex(inventory, "warehouse", &warehouse);
+        json_object_object_get_ex(product_obj,"isbn", &isbn);
+        json_object_object_get_ex(product_obj,"description", &description);
+        json_object_object_get_ex(product_obj,"extra", &extra);
+
+        strcpy(curProduct.product_id, json_object_get_string(product_id));
+        strcpy(curProduct.product_info.name, json_object_get_string(name));
+        strcpy(curProduct.product_info.brand, json_object_get_string(brand));
+        strcpy(curProduct.product_info.category, json_object_get_string(category));
+        curProduct.pricing.price = json_object_get_int(price);
+        strcpy(curProduct.pricing.currency, json_object_get_string(currency));
+        curProduct.inventory.stock = json_object_get_int(stock);
+        strcpy(curProduct.inventory.warehouse, json_object_get_string(warehouse));
+        strcpy(curProduct.isbn, json_object_get_string(isbn));
+        strcpy(curProduct.description, json_object_get_string(description));
+        strcpy(curProduct.extra, json_object_get_string(extra));
+
+        curCity.products[k] = curProduct; //curProduct curCitye eklendi
+        fwrite(&curProduct, sizeof(curProduct), 1, datFile); //product datFile'a yazıldı
+      }
+      curCountry.cities[j] = curCity;
     }
-  }
+    countriesUnordered[i] = curCountry;
+  } fclose(datFile); json_object_put(parsed_json);
+  #pragma endregion
   
+
 
 
 
