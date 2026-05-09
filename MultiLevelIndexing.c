@@ -51,13 +51,41 @@ typedef struct _Product_Info{ //product object
     int self_index;
   }Country;
 
-  struct {
+  struct { //City_Index
     int self_index;
     City city;
     int next_city_index;
     int product_index;
   }City_Index;
+
+  struct {
+    int self_index;
+    Product product;
+    int product_offset;
+    long dat_offset;
+  } Product_Index;
   #pragma endregion
+
+  #pragma region Search Operations
+
+   Country BinarySearch_Country(Country *countries[], int country_number, char countryName[]){
+    int middle = country_number/2; int end = country_number; int start = 0;
+    while(true){
+      Country compareCountry = *countries[middle];
+      if(strcmp(countryName, compareCountry.country) > 0){ //arattığımız country daha büyükse sağa geçer
+        start = middle; middle = (end-start)/2;
+      }
+      else if(strcmp(countryName, compareCountry.country) < 0){ //arattığımız country daha küçükse sola geçer
+        end = middle; middle = (end-start)/2;
+      }
+      else{ //countryi bulduysak
+        return compareCountry;
+      }
+    }
+  }
+
+
+  #pragma end region
 
 #pragma region Heap
 
@@ -98,7 +126,7 @@ typedef struct _Product_Info{ //product object
 
  #pragma endregion
 
-   int ReplacementSelectionSort(Country countries[], char sortWhat [], int country_number){
+   int ReplacementSelectionSort(Country countries[], char sortWhat [], int country_number){ //burayı yarım bırakıyorum
 
     Node *heap[HEAP_MAX]; Node *list[HEAP_MAX]; //heap ve list
     Node inputNode, outputNode; //country sort için input ve output
@@ -240,6 +268,28 @@ int main(int argc, char* argv){
       scanf("%d", &menu);
       
       if(menu == 1){ //search by country/city/product
+
+        int searchInt = 0;
+        while(true){ //hangisini aratmak istiyosa
+         printf("1.Search Country\n2.Search City\n3.Search Product");
+         scanf("%d",&searchInt);
+         if(searchInt != 1 && searchInt != 2 && searchInt != 3){printf("Please enter a number between 1-3"); continue;}
+         else{break;}  
+        }
+        char *searchString[15];
+
+        if(searchInt == 1){ //Country Search
+          printf("Enter a country name");
+          scanf("%s",searchString);
+          if(searchString[0] < 'A' || searchString[0] > 'Z'){ //user ilk harfi küçük girdiyse onu düzeltiyoz
+            searchString[0] = searchString[0] - 32;
+          }
+
+          Country country = BinarySearch_Country(countriesUnordered,country_number, searchString); //buraya şu an countriesUndored koyuyorum çünkü ege kara lab dosyasını yüklememiş
+
+        }
+        
+
 
       }
 
