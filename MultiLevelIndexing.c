@@ -60,7 +60,7 @@ typedef struct _Product_Info{ //product object
     int product_index;
   }City_Index;
 
-  typedef struct {
+  typedef struct { //Product_Index
     int self_index;
     Product product;
     int product_offset;
@@ -150,49 +150,49 @@ typedef struct _Product_Info{ //product object
 
   typedef struct{
     Country data;
+    int run_number;
   } Node;
 
-  void heapify(Node *heap[]){ 
-    int leftChild = 0, rightChild = 0; bool isRightChild = true;
-    for (int i = 0; i < HEAP_MAX; i++){
-      if(i == 0){leftChild = 1; rightChild = 2;}
-      else{leftChild = 2*i; rightChild = 2*i+1;}
+  
+void heapify(Node heap[], int rootIndex, int heapSize) { //roota konan node'u doğru yere kaydırır
+    int smallest = rootIndex; int leftChild = 2 * rootIndex + 1;  int rightChild = 2 * rootIndex + 2;
 
-      if(isRightChild){
-        isRightChild = reheap(*heap, i, rightChild);
-      }
-      else{
-        isRightChild = !reheap(*heap,i,leftChild);
-      }
+    if (leftChild < heapSize) {
+        if (heap[leftChild].run_number < heap[smallest].run_number || (heap[leftChild].run_number == heap[smallest].run_number && strcmp(heap[leftChild].data.country, heap[smallest].data.country) < 0)) {
+            smallest = leftChild; //leftChildın run_numberı küçükse veya run_numberlar eşitse ve left_child küçükse
+        }
     }
-  }
 
-  bool reheap(Node *heap[], int indexParent, int indexChild){ //bu metot sadece verilen indexleri karşılaştırıp gerekirse yer değiştirir
-    bool flag = false;
-    if(strcmp((*heap[indexParent]).data.country, (*heap[indexChild]).data.country) > 0){
-      Node temp = *heap[indexParent];
-      *heap[indexParent] = *heap[indexChild];
-      *heap[indexChild] = temp;
-      flag = true;
+    if (rightChild < heapSize) {
+        if (heap[rightChild].run_number < heap[smallest].run_number || (heap[rightChild].run_number == heap[smallest].run_number && strcmp(heap[rightChild].data.country, heap[smallest].data.country) < 0)) {
+            smallest = rightChild;
+        }
     }
-    return flag;
-  }
 
-  void insertToHeap(Node *heap[], Node insertNode){ //heapin 0. nodeuna insert yapar
-    *heap[0] = insertNode;
-    heapify(*heap);
-  }
+    if (smallest != rootIndex) { //root en küçük değilse root ile smallestı yer değiştir
+        Node temp = heap[rootIndex];
+        heap[rootIndex] = heap[smallest];
+        heap[smallest] = temp;
+
+        heapify(heap, smallest, heapSize);
+    }
+}
+
+void insertToHeap(Node heap[], Node insertNode, int heapSize) { //roota ekliyoruz sadece
+    heap[0] = insertNode;
+    heapify(heap, 0, heapSize);
+}
 
  #pragma endregion
 
  void printProductWithHeading(Product p){
   printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-10s %s\n","NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
-  printf("%-16s %-16s %-5s %-5s %-16s %-16s %-6s %-6s %-20s %-10s %s",
+  printf("%-16s %-16s %-5s %-5s %-16s %-16s %-6s %-6s %-20s %-10s",
     p.product_info.name,p.product_info.brand,p.pricing.price,p.pricing.currency,p.product_info.category,p.product_id,p.inventory.warehouse,p.inventory.stock,p.isbn,p.description,p.extra);
  }
 
  void printProduct(Product p){
-  printf("%-16s %-16s %-5s %-5s %-16s %-16s %-6s %-6s %-20s %-10s %s",
+  printf("%-16s %-16s %-5s %-5s %-16s %-16s %-6s %-6s %-20s %-10s",
     p.product_info.name,p.product_info.brand,p.pricing.price,p.pricing.currency,p.product_info.category,p.product_id,p.inventory.warehouse,p.inventory.stock,p.isbn,p.description,p.extra);
  }
 
@@ -203,7 +203,7 @@ typedef struct _Product_Info{ //product object
   }
  }
 
-   int ReplacementSelectionSort(Country countries[], char sortWhat [], int country_number){ //burayı yarım bırakıyorum
+  /* int ReplacementSelectionSort(Country countries[], char sortWhat [], int country_number){ //burayı yarım bırakıyorum
 
     Node *heap[HEAP_MAX]; Node *list[HEAP_MAX]; //heap ve list
     Node inputNode, outputNode; //country sort için input ve output
@@ -244,7 +244,7 @@ typedef struct _Product_Info{ //product object
 
 
 
-  }
+  }*/
 
 
 int main(int argc, char* argv){
@@ -335,7 +335,8 @@ int main(int argc, char* argv){
   #pragma region Sort
 
   City_Index city_index[100];
-  Product_Index product_index[100];
+  Product_Index product_index[900];
+  Country countries[10];
 
   #pragma endregion
 
@@ -351,6 +352,8 @@ int main(int argc, char* argv){
       printf("1.Search by Country/City/Product\n2.Sort and Display Index Levels\n3.Insert a New Product\n4.Apply Replacement Selection Sort\n5.Exit\n");
       int menu;
       scanf("%d", &menu);
+
+      #pragma region Search by Country/City/Product
       
       if(menu == 1){ //search by country/city/product
 
@@ -407,28 +410,59 @@ int main(int argc, char* argv){
             searchString[0] = searchString[0] - 32;
           }
 
-          FoundProduct foundproduct = Search_Product(countriesUnordered, country_number,searchString,city_index,product_index);
+          FoundProduct foundproduct = Search_Product(countriesUnordered, country_number,searchString,city_index,product_index); //countriesUnorderedı düzelt
           if(strcmp(foundproduct.product.product_info.name, "Product not found.") == 0){printf("Product not found");}
           else{
             printProductWithHeading(foundproduct.product);
             printf("\n %s,%s",foundproduct.city.city_name,foundproduct.country.country);
           }
-
-          
-
         }
 
         else{break;} //return to main menu
         getchar();
       }
-      
-
-        
-
-
       }
+      #pragma endregion
 
       else if(menu == 2){ //sort and display index level
+        while(true){ //menu == 2nin döngüsü
+
+          int scanInt1 = 0; 
+        while(true){ //scanin döngüsü
+          printf("1.Country Index Level\n2.City Index Level\n3.Product Index Level\n0.MAIN MENU");
+          scanf("%d",&scanInt1);
+          if(scanInt1 != 1 && scanInt1 != 2 && scanInt1 != 3 && scanInt1 != 0){printf("Please enter a number between 0-3"); continue;}
+          else{break;}
+        }
+
+        if(scanInt1 == 0){break;}
+
+        else if(scanInt1 == 1){ //Display sorted country
+          printf("%-10s %20s %s","COUNTRY","Offset City Index");
+          for (int i = 0; i < country_number; i++){
+            printf("%-10s %-20d",countries[i].country,countries[i].offset_CityIndex);
+          }  
+        }
+        else if(scanInt1 == 2){ //Display sorted city
+          for (int i = 0; i < country_number; i++){
+            printf("Country: %s", countries[i].country);
+            printf("%s %-15s %-9s %-13s","#", "CITY", "NEXT CITY", "PRODUCT INDEX");
+
+            int offset = countries[i].offset_CityIndex;
+            while(offset > -1){
+              printf("%d %-15s %-9d %-13d", offset, city_index[offset].city, city_index[offset].next_city_index, city_index[offset].product_index);
+              offset = city_index[offset].next_city_index;
+            }
+          }
+        }
+        else if(scanInt1 == 3){ //Display sorted product
+
+        }
+
+
+        }
+        
+        
 
       }
 
