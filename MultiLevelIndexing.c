@@ -2,6 +2,7 @@
 #include<json-c/json.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define HEAP_MAX 4
 int global_city_count = 0;
@@ -10,19 +11,19 @@ int global_product_count = 0;
 
 #pragma region Structs
 typedef struct _Product_Info{ //product object
-    char name[64];
-    char brand[64];
-    char category[64];
+    char name[40];
+    char brand[40];
+    char category[32];
   }Product_Info;
 
   typedef struct _Pricing{ //product object
     int price;
-    char currency[16];
+    char currency[4];
   }Pricing;
   
   typedef struct _Inventory{ //product object
     int stock;
-    char warehouse[16];
+    char warehouse[4];
   }Inventory;
 
   typedef struct _Product{
@@ -31,8 +32,9 @@ typedef struct _Product_Info{ //product object
     Pricing pricing;
     Inventory inventory;
     char isbn[32];
-    char description[128];
-    char extra[64];
+    char description[64];
+    char extra[16];
+    long dat_offset;
   }Product;
 
   typedef struct _Meta{ //city object
@@ -43,7 +45,7 @@ typedef struct _Product_Info{ //product object
   typedef struct _City{
     char city_name[16];
     Meta meta;
-    Product products[32];
+    Product products[12];
     int product_number;
   }City;
 
@@ -70,7 +72,7 @@ typedef struct _Product_Info{ //product object
   } Product_Index;
   #pragma endregion
 
-#pragma region Search Operations //searchlerin bulunamadığı ihtimali yapmayı unutma Countryde
+#pragma region Search Operations 
 
   typedef struct{ //SearchCity için
     City city;
@@ -84,43 +86,45 @@ typedef struct _Product_Info{ //product object
   }FoundProduct;
 
 
-   Country BinarySearch_Country(Country countries[], int country_number, char countryName[]){
-    int middle = country_number/2; int end = country_number; int start = 0;
-    while(true){
-      Country compareCountry = countries[middle];
-      if(strcasecmp(countryName, compareCountry.country) > 0){ //arattığımız country daha büyükse sağa geçer
-        start = middle; middle = (end-start)/2;
+   Country* BinarySearch_Country(Country countries[], int country_number, char countryName[]){
+    int middle = country_number/2; int end = country_number-1; int start = 0;
+    while(start <= end){
+      Country *compareCountry = &countries[middle];
+      if(strcasecmp(countryName, compareCountry->country) > 0){ //arattığımız country daha büyükse sağa geçer
+        start = middle+1; middle = (end+start)/2;
       }
-      else if(strcasecmp(countryName, compareCountry.country) < 0){ //arattığımız country daha küçükse sola geçer
-        end = middle; middle = (end-start)/2;
+      else if(strcasecmp(countryName, compareCountry->country) < 0){ //arattığımız country daha küçükse sola geçer
+        end = middle-1; middle = (end+start)/2;
       }
       else{ //countryi bulduysak
-        return compareCountry;
+        return &countries[middle];
       }
     }
+    return NULL;
   }
 
-  FoundCity Search_City(Country countries[], int country_number, char cityName[], City_Index city_index[]){
-    FoundCity foundcity;
+  FoundCity* Search_City(Country countries[], int country_number, char cityName[], City_Index city_index[]){
+
+    FoundCity* foundcity = malloc(sizeof(FoundCity)); //yine malloc olmayınca segmentation fault aldım
     for (int i = 0; i < country_number; i++) {
         int offset = countries[i].offset_CityIndex;
         
         while (offset != -1) {
             if (strcasecmp(cityName, city_index[offset].city.city_name) == 0) {
-              foundcity.city = city_index[offset].city; //bulunan şehri kaydet
-              foundcity.country = countries[i]; //bulunan şehrin ülkesini kaydet
+              foundcity->city = city_index[offset].city; //bulunan şehri kaydet
+              foundcity->country = countries[i]; //bulunan şehrin ülkesini kaydet
               return foundcity;
             }
             offset = city_index[offset].next_city_index;
         }
     }
     
-    strcpy(foundcity.city.city_name, "City not found."); //city bulunmadıysa
+    strcpy(foundcity->city.city_name, "City not found."); //city bulunmadıysa
     return foundcity;
   }
 
-  FoundProduct Search_Product(Country countries[], int country_number, char productName[], City_Index city_index[], Product_Index product_index[]){
-    FoundProduct foundproduct;
+  FoundProduct* Search_Product(Country countries[], int country_number, char productName[], City_Index city_index[], Product_Index product_index[]){
+    FoundProduct* foundproduct = malloc(sizeof(FoundProduct));
     for (int i = 0; i < country_number; i++) {
         int offset = countries[i].offset_CityIndex;
         
@@ -129,9 +133,9 @@ typedef struct _Product_Info{ //product object
             
             while (p_offset != -1) {
                 if (strcasecmp(productName, product_index[p_offset].product.product_info.name) == 0) {
-                  foundproduct.product = product_index[p_offset].product; //bulunan productı kaydet
-                  foundproduct.city = city_index[offset].city; //bulunan productın citysini kaydet
-                  foundproduct.country = countries[i]; //bulunan productın ülkesini kaydet
+                  foundproduct->product = product_index[p_offset].product; //bulunan productı kaydet
+                  foundproduct->city = city_index[offset].city; //bulunan productın citysini kaydet
+                  foundproduct->country = countries[i]; //bulunan productın ülkesini kaydet
                     return foundproduct;
                 }
                 p_offset = product_index[p_offset].product_offset; //diğer ürüne geçiyo
@@ -141,7 +145,7 @@ typedef struct _Product_Info{ //product object
     }
     
     
-    strcpy(foundproduct.product.product_info.name, "Product not found.");
+    strcpy(foundproduct->product.product_info.name, "Product not found.");
     return foundproduct;
   }
 
@@ -229,14 +233,15 @@ void insertProductToHeap(ProductNode heap[], ProductNode insertNode, int heapSiz
 
  #pragma endregion
 
- void printProductWithHeading(Product p){
-  printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-10s %s\n","NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
-  printf("%-16s %-16s %-5s %-5s %-16s %-16s %-6s %-6s %-20s %-10s",
-    p.product_info.name,p.product_info.brand,p.pricing.price,p.pricing.currency,p.product_info.category,p.product_id,p.inventory.warehouse,p.inventory.stock,p.isbn,p.description,p.extra);
+ void printProductWithHeading(Product *p){
+  printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-20s %s\n", "NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
+  
+  printf("%-16s %-16s %-5d %-4s %-16s %-16s %-9s %-6d %-20s %-20s %s\n",
+    p->product_info.name, p->product_info.brand, p->pricing.price, p->pricing.currency,p->product_info.category,p->product_id,p->inventory.warehouse,p->inventory.stock,p->isbn,p->description,p->extra);
  }
 
  void printProduct(Product p){
-  printf("%-16s %-16s %-5s %-5s %-16s %-16s %-6s %-6s %-20s %-10s",
+  printf("%-16s %-16s %-5d %-5s %-16s %-16s %-6d %-6s %-20s %-10s",
     p.product_info.name,p.product_info.brand,p.pricing.price,p.pricing.currency,p.product_info.category,p.product_id,p.inventory.warehouse,p.inventory.stock,p.isbn,p.description,p.extra);
  }
 
@@ -327,6 +332,108 @@ void RSS_Products(Product unsorted[], int num_elements, Product sorted_output[])
     }
 }
 
+void Merge_Runs_Cities(City array[], int num_elements) {
+    if (num_elements <= 1) return;
+    City *temp = (City *)malloc(num_elements * sizeof(City));
+    int fully_sorted = 0; // 0: false, 1: true
+
+    while (!fully_sorted) {
+        fully_sorted = 1; // Başlangıçta sıralı varsayıyoruz
+        int i = 0;
+
+        while (i < num_elements) {
+            int start1 = i;
+            // 1. Run'ın sonunu bul (Alfabetik olarak bozulduğu yer)
+            while (i + 1 < num_elements && strcasecmp(array[i].city_name, array[i+1].city_name) <= 0) {
+                i++;
+            }
+            int end1 = i;
+            i++; // 2. Run'ın başlangıcına geç
+
+            if (i >= num_elements) break; // Birleşecek 2. Run kalmadıysa çık
+
+            fully_sorted = 0; // Kırılma noktası bulduk, demek ki henüz tam sıralı değil
+            int start2 = i;
+            // 2. Run'ın sonunu bul
+            while (i + 1 < num_elements && strcasecmp(array[i].city_name, array[i+1].city_name) <= 0) {
+                i++;
+            }
+            int end2 = i;
+            i++;
+
+            // Run 1 ve Run 2'yi temp dizisinde birleştir (Klasik Merge işlemi)
+            int p1 = start1, p2 = start2, k = start1;
+            while (p1 <= end1 && p2 <= end2) {
+                if (strcasecmp(array[p1].city_name, array[p2].city_name) <= 0) {
+                    temp[k++] = array[p1++];
+                } else {
+                    temp[k++] = array[p2++];
+                }
+            }
+            // Kalan elemanları ekle
+            while (p1 <= end1) temp[k++] = array[p1++];
+            while (p2 <= end2) temp[k++] = array[p2++];
+
+            // Birleşmiş kısmı asıl diziye geri kopyala
+            for (int j = start1; j <= end2; j++) {
+                array[j] = temp[j];
+            }
+        }
+    }
+    free(temp); // Belleği temizle
+}
+
+// --- PRODUCTS İÇİN RUN BİRLEŞTİRİCİ ---
+void Merge_Runs_Products(Product array[], int num_elements) {
+    if (num_elements <= 1) return;
+    Product *temp = (Product *)malloc(num_elements * sizeof(Product));
+    int fully_sorted = 0;
+
+    while (!fully_sorted) {
+        fully_sorted = 1; 
+        int i = 0;
+
+        while (i < num_elements) {
+            int start1 = i;
+            // 1. Run'ın sonunu bul
+            while (i + 1 < num_elements && strcasecmp(array[i].product_info.name, array[i+1].product_info.name) <= 0) {
+                i++;
+            }
+            int end1 = i;
+            i++;
+
+            if (i >= num_elements) break;
+
+            fully_sorted = 0;
+            int start2 = i;
+            // 2. Run'ın sonunu bul
+            while (i + 1 < num_elements && strcasecmp(array[i].product_info.name, array[i+1].product_info.name) <= 0) {
+                i++;
+            }
+            int end2 = i;
+            i++;
+
+            // Run 1 ve Run 2'yi temp dizisinde birleştir
+            int p1 = start1, p2 = start2, k = start1;
+            while (p1 <= end1 && p2 <= end2) {
+                if (strcasecmp(array[p1].product_info.name, array[p2].product_info.name) <= 0) {
+                    temp[k++] = array[p1++];
+                } else {
+                    temp[k++] = array[p2++];
+                }
+            }
+            while (p1 <= end1) temp[k++] = array[p1++];
+            while (p2 <= end2) temp[k++] = array[p2++];
+
+            // Asıl diziye geri kopyala
+            for (int j = start1; j <= end2; j++) {
+                array[j] = temp[j];
+            }
+        }
+    }
+    free(temp);
+}
+
 void Build_All_Indexes(Country countriesUnordered[], int country_number, City_Index city_index[], Product_Index product_index[]) {
     
     for (int i = 0; i < country_number; i++) {
@@ -339,6 +446,7 @@ void Build_All_Indexes(Country countriesUnordered[], int country_number, City_In
         // 1. Bu ülkenin şehirlerini RSS ile sırala
         City sorted_cities[c_count];
         RSS_Cities(countriesUnordered[i].cities, c_count, sorted_cities);
+        Merge_Runs_Cities(sorted_cities, c_count);
 
         // Ülkenin ilk şehrinin offset'ini belirle
         countriesUnordered[i].offset_CityIndex = global_city_count;
@@ -365,6 +473,7 @@ void Build_All_Indexes(Country countriesUnordered[], int country_number, City_In
                 // 3. Bu şehrin ürünlerini RSS ile sırala
                 Product sorted_products[p_count];
                 RSS_Products(sorted_cities[j].products, p_count, sorted_products);
+                Merge_Runs_Products(sorted_products, p_count);
 
                 // 4. Sıralanmış ürünleri product_index'e kaydet
                 for (int k = 0; k < p_count; k++) {
@@ -399,17 +508,14 @@ int main(int argc, char* argv){
   FILE *datFile = fopen("Binary.dat", "wb");
 
   struct json_object *parsed_json = json_object_from_file("Assignment -2.json");
-  if (parsed_json == NULL) {
-    printf("HATA: JSON dosyasi bulunamadi! Dosya adini ve klasoru kontrol et.\n");
-    return 1; // Çökmesini engelleyip programı kapatır
-}
+
   int country_number = json_object_array_length(parsed_json);
-  Country countriesUnordered [country_number];
+  Country *countriesUnordered = malloc(country_number * sizeof(Country)); //countriesi heap belleğinde oluşturuyoruz, öyle yapmayınca segmentation fault veriyor
 
   for (int i = 0; i < country_number; i++){ //country döngüsü
-    printf("3. %d. Ulke dongusune girildi...\n", i);
-    Country curCountry;
-    curCountry.city_number = 0;
+
+    Country *curCountry = &countriesUnordered[i]; //curCountry'i countriesUnordered'ın ilk yerine koyuyoruz
+    curCountry->city_number = 0;
     struct json_object *country_obj = json_object_array_get_idx(parsed_json,i); //i inci countryi alır
     struct json_object *country, *country_code, *cities; //countrynin içindekiler
 
@@ -417,13 +523,13 @@ int main(int argc, char* argv){
     json_object_object_get_ex(country_obj, "country_code", &country_code);
     json_object_object_get_ex(country_obj,"cities", &cities);
 
-    strcpy(curCountry.country,json_object_get_string(country));
-    strcpy(curCountry.country_code, json_object_get_string(country_code));
+    if(country != NULL) strcpy(curCountry->country,json_object_get_string(country)); //segmentation fault NULLu strcpy yapmaya çalışınca da çıkabiliyomuş
+    if(country_code != NULL) strcpy(curCountry->country_code, json_object_get_string(country_code));
 
     int city_number = json_object_array_length(cities);
     for (int j = 0; j < city_number; j++){ //city döngüsü
-      City curCity;
-      curCity.product_number = 0;
+      City *curCity = &curCountry->cities[j];
+      curCity->product_number = 0;
       struct json_object *city_obj = json_object_array_get_idx(cities,j);
       struct json_object *city_name, *meta,*population,*region, *products;
 
@@ -433,14 +539,14 @@ int main(int argc, char* argv){
       json_object_object_get_ex(meta,"region", &region);
       json_object_object_get_ex(city_obj,"products", &products);
 
-      strcpy(curCity.city_name, json_object_get_string(city_name));
-      strcpy(curCity.meta.region, json_object_get_string(region));
-      curCity.meta.population = json_object_get_int64(population);
+      if(city_name != NULL) strcpy(curCity->city_name, json_object_get_string(city_name));
+      if(region != NULL) strcpy(curCity->meta.region, json_object_get_string(region));
+      curCity->meta.population = json_object_get_int64(population);
 
       //city bitti product yapcan şimdi. sonrasında countrye cityi, citye productı dahil etmeyi unutma
       int product_number = json_object_array_length(products);
       for (int k = 0; k < product_number; k++){
-        Product curProduct;
+        Product *curProduct = &curCity->products[k];
         struct json_object *product_obj = json_object_array_get_idx(products,k);
         struct json_object *product_id, *product_info, *name, *brand, *category, *pricing, *price, *currency, *inventory, *stock, *warehouse, *isbn, *description, *extra;
 
@@ -459,29 +565,30 @@ int main(int argc, char* argv){
         json_object_object_get_ex(product_obj,"description", &description);
         json_object_object_get_ex(product_obj,"extra", &extra);
 
-        strcpy(curProduct.product_id, json_object_get_string(product_id));
-        strcpy(curProduct.product_info.name, json_object_get_string(name));
-        strcpy(curProduct.product_info.brand, json_object_get_string(brand));
-        strcpy(curProduct.product_info.category, json_object_get_string(category));
-        curProduct.pricing.price = json_object_get_int(price);
-        strcpy(curProduct.pricing.currency, json_object_get_string(currency));
-        curProduct.inventory.stock = json_object_get_int(stock);
-        strcpy(curProduct.inventory.warehouse, json_object_get_string(warehouse));
-        strcpy(curProduct.isbn, json_object_get_string(isbn));
-        strcpy(curProduct.description, json_object_get_string(description));
-        strcpy(curProduct.extra, json_object_get_string(extra));
+        if(product_id != NULL) strcpy(curProduct->product_id, json_object_get_string(product_id));
+        if(name != NULL) strcpy(curProduct->product_info.name, json_object_get_string(name));
+        if(brand != NULL) strcpy(curProduct->product_info.brand, json_object_get_string(brand));
+        if(category != NULL) strcpy(curProduct->product_info.category, json_object_get_string(category));
+        if(price != NULL) curProduct->pricing.price = json_object_get_int(price);
+        if(currency != NULL) strcpy(curProduct->pricing.currency, json_object_get_string(currency));
+        if(stock != NULL) curProduct->inventory.stock = json_object_get_int(stock);
+        if(warehouse != NULL) strcpy(curProduct->inventory.warehouse, json_object_get_string(warehouse));
+        if(isbn != NULL) strcpy(curProduct->isbn, json_object_get_string(isbn));
+        if(description != NULL) strcpy(curProduct->description, json_object_get_string(description));
+        if(extra != NULL) strcpy(curProduct->extra, json_object_get_string(extra));
 
-        curCity.products[k] = curProduct; curCity.product_number++; //curProduct curCitye eklendi
-        fwrite(&curProduct, sizeof(curProduct), 1, datFile); //product datFile'a yazıldı
+        long bytePosition = ftell(datFile); //datFileda nerde kaldık
+        curProduct->dat_offset = bytePosition;
+
+        curCity->product_number++; 
+        fwrite(curProduct, sizeof(Product), 1, datFile); //product datFile'a yazıldı
       }
-      curCountry.cities[j] = curCity; curCountry.city_number++;
+       curCountry->city_number++;
     }
-    countriesUnordered[i] = curCountry;
   } fclose(datFile); json_object_put(parsed_json);
   #pragma endregion
-  printf("4. Tum okuma bitti, menuye geciliyor...\n");
   
-
+  
 
   #pragma region Sort
 
@@ -528,55 +635,57 @@ int main(int argc, char* argv){
 
         int searchInt = 0;
         while(true){ //hangisini aratmak istiyosa
-         printf("1.Search Country\n2.Search City\n3.Search Product\n0.MAIN MENU");
+         printf("\n1.Search Country\n2.Search City\n3.Search Product\n0.MAIN MENU\n");
          scanf("%d",&searchInt);
-         if(searchInt != 1 && searchInt != 2 && searchInt != 3 && searchInt != 0){printf("Please enter a number between 0-3"); continue;}
+         if(searchInt != 1 && searchInt != 2 && searchInt != 3 && searchInt != 0){printf("Please enter a number between 0-3\n");}
          else{break;}  
         }
         char searchString[15];
 
         if(searchInt == 1){ //Country Search
-          printf("Enter a country name");
-          scanf("%s",searchString);
+          printf("Enter a country name: ");
+          scanf(" %49[^\n]", searchString); //paşam boşluk okusun
           
-          Country country = BinarySearch_Country(countriesUnordered,country_number, searchString); 
-          printf("Country name: %s\nCountry Code: %s\nCities: \n",country.country,country.country_code);
-          for (int i = 0; i < country.city_number; i++){
-            printf("%s\n",country.cities[i].city_name);
-            printf(" Products:\n");
-            for (int j = 0; j < country.cities[i].product_number; j++){
-              printf((country.cities[i]).products[j].product_info.name);
-            }
-          }          
+          Country *country = BinarySearch_Country(countries,country_number, searchString); 
+          if(country == NULL){printf("Country not found. \n");}
+          else{
+          printf("COUNTRY NAME: %s\nCOUNTRY CODE: %s\nCITIES: \n",country->country,country->country_code);
+          for (int i = 0; i < country->city_number; i++){
+            printf("%s\n",country->cities[i].city_name);
+          }      
+        }
         }
 
-        else if(searchInt == 2){ //City Search
-          printf("Enter a city name");
+        else if(searchInt == 2){ //City Search //buraya see product details gibi bişey ekleyebilirim
+          printf("Enter a city name: ");
           scanf("%s",searchString);
 
-          FoundCity foundcity = Search_City(countries, country_number, searchString, city_index);    
-          if(strcmp(foundcity.city.city_name, "City not found.") == 0){printf("City not found");}
+          FoundCity *foundcity = Search_City(countries, country_number, searchString, city_index);    
+          if(strcmp(foundcity->city.city_name, "City not found.") == 0){printf("City not found");}
           else{
-             printf("City name: %s in %s\n Products:",foundcity.city.city_name,foundcity.country.country);
-             for (int i = 0; i < foundcity.city.product_number; i++){
-               printf(foundcity.city.products[i].product_info.name);
+             printf("\nCity name: %s in %s\nPopulation: %d\nRegion: %s\nPRODUCTS:\n",foundcity->city.city_name,foundcity->country.country,foundcity->city.meta.population,foundcity->city.meta.region);
+             for (int i = 0; i < foundcity->city.product_number; i++){
+               printf(foundcity->city.products[i].product_info.name);
+               printf("\n");
              }
           }
+          free(foundcity); //bellek işleri beni yoruyo ya
         }
 
         else if(searchInt == 3){ //Product Search
-          printf("Enter a product name");
-          /*scanf("%s",searchString);
-          if(searchString[0] < 'A' || searchString[0] > 'Z'){ //user ilk harfi küçük girdiyse onu düzeltiyoz
+          printf("Enter a product name: ");
+          scanf(" %49[^\n]", searchString); //bu garip şeyin nedeni birden fazla kelime almak
+         /* if(searchString[0] < 'A' || searchString[0] > 'Z'){ //user ilk harfi küçük girdiyse onu düzeltiyoz
             searchString[0] = searchString[0] - 32;
           }*/
 
-          FoundProduct foundproduct = Search_Product(countries, country_number,searchString,city_index,product_index); //countriesUnorderedı düzelt
-          if(strcmp(foundproduct.product.product_info.name, "Product not found.") == 0){printf("Product not found");}
+          FoundProduct *foundproduct = Search_Product(countries, country_number,searchString,city_index,product_index); 
+          if(strcmp(foundproduct->product.product_info.name, "Product not found.") == 0){printf("Product not found");}
           else{
-            printProductWithHeading(foundproduct.product);
-            printf("\n %s,%s",foundproduct.city.city_name,foundproduct.country.country);
+            printf("\n%s,%s\n",foundproduct->city.city_name,foundproduct->country.country);
+            printProductWithHeading(&(foundproduct->product));
           }
+          free(foundproduct);
         }
 
         else{break;} //return to main menu
@@ -589,7 +698,7 @@ int main(int argc, char* argv){
 
           int scanInt1 = 0; 
         while(true){ //scanin döngüsü
-          printf("1.Country Index Level\n2.City Index Level\n3.Product Index Level\n0.MAIN MENU\n");
+          printf("\n1.Country Index Level\n2.City Index Level\n3.Product Index Level\n0.MAIN MENU\n");
           scanf("%d",&scanInt1);
           if(scanInt1 != 1 && scanInt1 != 2 && scanInt1 != 3 && scanInt1 != 0){printf("Please enter a number between 0-3\n"); continue;}
           else{break;}
@@ -600,12 +709,12 @@ int main(int argc, char* argv){
         else if(scanInt1 == 1){ //Display sorted country
           printf("%-10s %20s\n","COUNTRY","Offset City Index");
           for (int i = 0; i < country_number; i++){
-            printf("%-10s %-20d\n",countries[i].country,countries[i].offset_CityIndex);
+            printf("%-20s %-10d\n",countries[i].country,countries[i].offset_CityIndex);
           }  
         }
         else if(scanInt1 == 2){ //Display sorted city
           for (int i = 0; i < country_number; i++){
-            printf("Country: %s\n", countries[i].country);
+            printf("\nCountry: %s\n", countries[i].country);
             printf("%s %-15s %-9s %-13s\n","#", "CITY", "NEXT CITY", "PRODUCT INDEX");
 
             int offset = countries[i].offset_CityIndex;
@@ -621,12 +730,12 @@ int main(int argc, char* argv){
             int offset = countries[i].offset_CityIndex;
             while(offset > -1){ //cityi gösteren offset
               City city = city_index[offset].city;
-              printf("%s, %s\n",city.city_name, countries[i].country); //şehir,ülke
+              printf("\n%s, %s\n",city.city_name, countries[i].country); //şehir,ülke
               printf("%s %-25s %-14s %-12s\n","#", "PRODUCT NAME", "PRODUCT OFFSET", ".dat OFFSET");
               
               int p_offset = city_index[offset].product_index;
               while(p_offset > -1){ //productı gösteren offset
-                printf("%d %-25s %-14d %-12d\n", p_offset, product_index[p_offset].product.product_info.name, product_index[p_offset].product_offset,product_index[p_offset].dat_offset);
+                printf("%d %-25s %-14d %-12ld\n", p_offset, product_index[p_offset].product.product_info.name, product_index[p_offset].product_offset,product_index[p_offset].product.dat_offset);
                 p_offset = product_index[p_offset].product_offset;
               }
               offset = city_index[offset].next_city_index;
@@ -643,7 +752,7 @@ int main(int argc, char* argv){
 
       }
 
-      else if(menu == 3){ //insert a new product
+      else if(menu == 3){ //insert a new product //just tek kelime product ekliyor
 
         char targetCountry[50];
         char targetCity[50];
@@ -730,7 +839,7 @@ int main(int argc, char* argv){
         city_index[target_city_offset].city.product_number++; 
         global_product_count++; 
         
-        printf("Product '%s' successfully inserted in alphabetical order!\n", newProduct.product_info.name);
+        printf("\nProduct '%s' successfully inserted in alphabetical order!\n", newProduct.product_info.name);
 
       }
 

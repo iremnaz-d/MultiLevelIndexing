@@ -1,2 +1,2 @@
 gcc MultiLevelIndexing.c -o MultiLevelIndexing.out -ljson-c
-./MultiLevelIndexing
+./MultiLevelIndexing.out
