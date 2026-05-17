@@ -79,13 +79,6 @@ typedef struct _Product_Info{ //product object
     Country country;
   }FoundCity;
 
-  typedef struct{ //SearchCountry için
-    Country country;
-    City city;
-    Product product;
-  }FoundProduct;
-
-
    Country* BinarySearch_Country(Country countries[], int country_number, char countryName[]){
     int middle = country_number/2; int end = country_number-1; int start = 0;
     while(start <= end){
@@ -123,8 +116,8 @@ typedef struct _Product_Info{ //product object
     return foundcity;
   }
 
-  FoundProduct* Search_Product(Country countries[], int country_number, char productName[], City_Index city_index[], Product_Index product_index[]){
-    FoundProduct* foundproduct = malloc(sizeof(FoundProduct));
+  long Search_Product(Country countries[], int country_number, char productName[], City_Index city_index[], Product_Index product_index[], int *found_country_idx, int *found_city_offset){
+    
     for (int i = 0; i < country_number; i++) {
         int offset = countries[i].offset_CityIndex;
         
@@ -133,27 +126,26 @@ typedef struct _Product_Info{ //product object
             
             while (p_offset != -1) {
                 if (strcasecmp(productName, product_index[p_offset].product.product_info.name) == 0) {
-                  foundproduct->product = product_index[p_offset].product; //bulunan productı kaydet
-                  foundproduct->city = city_index[offset].city; //bulunan productın citysini kaydet
-                  foundproduct->country = countries[i]; //bulunan productın ülkesini kaydet
-                    return foundproduct;
+                    
+                    *found_country_idx = i; printf("Country index: %d -->", i);
+                    *found_city_offset = offset; printf("City offset: %d -->", offset);
+                    
+                    printf("Product offset: %d --> .dat offset: %ld", p_offset, product_index[p_offset].product.dat_offset);
+                    
+                    return product_index[p_offset].product.dat_offset; //dat_offset döner
                 }
-                p_offset = product_index[p_offset].product_offset; //diğer ürüne geçiyo
+                p_offset = product_index[p_offset].product_offset; 
             }
-            offset = city_index[offset].next_city_index; //diğer şehre geçiyo
+            offset = city_index[offset].next_city_index; 
         }
     }
     
-    
-    strcpy(foundproduct->product.product_info.name, "Product not found.");
-    return foundproduct;
-  }
-
+    return -1; //bulunamadıysa -1 döner
+}
 
   #pragma endregion
 
 #pragma region Heap
-
   typedef struct{
     City data;
     int run_number;
@@ -262,7 +254,7 @@ void insertProductToHeap(ProductNode heap[], ProductNode insertNode, int heapSiz
 
  #pragma endregion
 
-#pragma region Prints
+#pragma region Print
 void printProductWithHeading(Product *p){
   printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-20s %s\n", "NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
   
@@ -348,7 +340,6 @@ void Visualized_RSS_Countries(Country unsorted[], int country_number, Country ou
     while (inputIndex < country_number) {
         CountryNode minNode = heap[0];
         output[outputIndex++] = minNode.data;
-    
 
         printf("%s --> OUTPUT         ", minNode.data.country);
 
@@ -371,9 +362,7 @@ void Visualized_RSS_Countries(Country unsorted[], int country_number, Country ou
         CountryNode minNode = heap[0];
         output[outputIndex++] = minNode.data;
         
-        if (minNode.run_number > current_print_run) {
-            current_print_run = minNode.run_number;
-        }
+        if (minNode.run_number > current_print_run) {current_print_run = minNode.run_number;}
 
         heap[0] = heap[size - 1];
         size--;
@@ -665,8 +654,7 @@ void SortAndIndex(Country countriesUnordered[], int country_number, City_Index c
 
 int main(int argc, char* argv){
 
-  #pragma region JsonParse
-
+#pragma region JsonParse
   FILE *datFile = fopen("Binary.dat", "wb");
 
   struct json_object *parsed_json = json_object_from_file("Assignment -2.json");
@@ -748,9 +736,9 @@ int main(int argc, char* argv){
        curCountry->city_number++;
     }
   } fclose(datFile); json_object_put(parsed_json);
-  #pragma endregion
+#pragma endregion
   
-  #pragma region Sort
+#pragma region Sort
 
   City_Index city_index[100];
   Product_Index product_index[900];
@@ -760,19 +748,17 @@ int main(int argc, char* argv){
         countries[i] = countriesUnordered[i];
     }
 
-    // 2. Ülkeleri Alfabetik Olarak Sırala (Basit Bubble Sort yeterlidir)
-    for (int i = 0; i < country_number - 1; i++) {
+    for (int i = 0; i < country_number - 1; i++) { //country sort, her i turu bittiğinde i kadar eleman sıralanmış olur
         for (int j = 0; j < country_number - i - 1; j++) {
-            if (strcasecmp(countries[j].country, countries[j+1].country) > 0) {
+            if (strcasecmp(countries[j].country, countries[j+1].country) > 0) {//bu ikisinin sırası yanlışsa yer değiştiriliyo
                 Country temp = countries[j];
                 countries[j] = countries[j+1];
                 countries[j+1] = temp;
             }
         }
     }
-  SortAndIndex(countries, country_number, city_index, product_index);
-
-  #pragma endregion
+  SortAndIndex(countries, country_number, city_index, product_index); //city and product sort
+ #pragma endregion
 
     while(true){ //main menu döngüsü
       printf("1.Search by Country/City/Product\n2.Sort and Display Index Levels\n3.Insert a New Product\n4.Apply Replacement Selection Sort\n5.Exit\n");
@@ -827,17 +813,22 @@ int main(int argc, char* argv){
         else if(searchInt == 3){ //Product Search
           printf("Enter a product name: ");
           scanf(" %49[^\n]", searchString); //bu garip şeyin nedeni birden fazla kelime almak
-         /* if(searchString[0] < 'A' || searchString[0] > 'Z'){ //user ilk harfi küçük girdiyse onu düzeltiyoz
-            searchString[0] = searchString[0] - 32;
-          }*/
 
-          FoundProduct *foundproduct = Search_Product(countries, country_number,searchString,city_index,product_index); 
-          if(strcmp(foundproduct->product.product_info.name, "Product not found.") == 0){printf("Product not found");}
+          int found_c_idx = -1; int found_city_off = -1;
+          long dat_offset = Search_Product(countries, country_number, searchString, city_index, product_index, &found_c_idx, &found_city_off);
+
+          if(dat_offset == -1){printf("Product not found\n");}
+
           else{
-            printf("\n%s,%s\n",foundproduct->city.city_name,foundproduct->country.country);
-            printProductWithHeading(&(foundproduct->product));
+            printf("\n%s, %s\n", city_index[found_city_off].city.city_name, countries[found_c_idx].country);
+            FILE *datFile = fopen("Binary.dat", "rb");
+            Product product;
+            fseek(datFile, dat_offset, SEEK_SET);
+            fread(&product, sizeof(Product), 1, datFile);
+            fclose(datFile);
+
+            printProductWithHeading(&product);
           }
-          free(foundproduct);
         }
 
         else{break;} //return to main menu
@@ -925,7 +916,7 @@ int main(int argc, char* argv){
             continue;
         }
 
-        int city_offset = -1; //cityToAdd'in indexi
+        int city_offset = -2; //cityToAdd'in indexi
         int curCity_offset = countries[countryIndex].offset_CityIndex;
         while (curCity_offset != -1) { //cityToAdd'in city_indextteki yerini buluyoruz
             if (strcasecmp(city_index[curCity_offset].city.city_name, cityToAdd) == 0) {
@@ -934,7 +925,7 @@ int main(int argc, char* argv){
             curCity_offset = city_index[curCity_offset].next_city_index;
         }
 
-        if (city_offset == -1) {printf("\nCity not found in %s\n\n", countries[countryIndex].country); continue;} //city bulunamadıysa
+        if (city_offset == -2) {printf("\nCity not found in %s\n\n", countries[countryIndex].country); continue;} //city bulunamadıysa
 
         printf("Enter new product name: ");
         scanf(" %[^\n]", newProduct.product_info.name); //bu da boşluklu alıyo 
@@ -1036,11 +1027,9 @@ int main(int argc, char* argv){
       else if(menu == 5){break;} //exit //burda yapmam gereken dah afazla şey var muhtemelen
 
       else{
-        printf("Enter a number between 1-5");
+        printf("Enter a number between 1-5\n\n");
         continue;
       }
 
     }
-
-
 }
