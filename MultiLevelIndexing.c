@@ -5,8 +5,8 @@
 #include <stdlib.h>
 
 #define HEAP_MAX 4
-int global_city_count = 0;
-int global_product_count = 0;
+int allCity_number = 0;
+int allProduct_number = 0;
 
 
 #pragma region Structs
@@ -262,37 +262,97 @@ void insertProductToHeap(ProductNode heap[], ProductNode insertNode, int heapSiz
 
  #pragma endregion
 
+ #pragma region Prints
+void printProductWithHeading(Product *p){
+  printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-20s %s\n", "NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
+  
+  printf("%-16s %-16s %-5d %-4s %-16s %-16s %-9s %-6d %-20s %-20s %s\n",
+    p->product_info.name, p->product_info.brand, p->pricing.price, p->pricing.currency,p->product_info.category,p->product_id,p->inventory.warehouse,p->inventory.stock,p->isbn,p->description,p->extra);
+ }
+
+ void printProduct(Product p){
+  printf("%-16s %-16s %-5d %-5s %-16s %-16s %-6d %-6s %-20s %-10s",
+    p.product_info.name,p.product_info.brand,p.pricing.price,p.pricing.currency,p.product_info.category,p.product_id,p.inventory.warehouse,p.inventory.stock,p.isbn,p.description,p.extra);
+ }
+
+ void printAllProducts(City city){
+  printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-10s %s\n","NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
+  for (int i = 0; i < city.product_number; i++){
+    printProduct(city.products[i]);
+  }
+ }
+
+ void printRSS(Country input[], Country output[], CountryNode heap[],int inputIndex, int outputIndex, int country_number,int heapSize){
+    int input_remaining = country_number - inputIndex;
+    
+    // Üç sütundan en uzun olanı buluyoruz ki tablo yarım kesilmesin
+    int max_rows = outputIndex;
+    if (heapSize > max_rows) max_rows = heapSize;
+    if (input_remaining > max_rows) max_rows = input_remaining;
+
+    printf("\n%-25s | %-30s | %-25s\n", "OUTPUT", "HEAP", "INPUT");
+    printf("--------------------------|--------------------------------|--------------------------\n");
+
+    for (int i = 0; i < max_rows; i++) {
+        char out_str[50] = "";
+        char heap_str[50] = "";
+        char in_str[50] = "";
+
+        // Sol Sütun: Output (Artık sıralanmış ve Run'lara ayrılmış kısım)
+        if (i < outputIndex) {
+            sprintf(out_str, "%s", output[i].country);
+        }
+
+        // Orta Sütun: Heap (İçindeki elemanlar ve Run numaraları)
+        if (i < heapSize) {
+            sprintf(heap_str, "[R%d] %s", heap[i].run_number, heap[i].data.country);
+        }
+
+        // Sağ Sütun: Input (Henüz okunmamış, bekleyen elemanlar)
+        if (i < input_remaining) {
+            sprintf(in_str, "%s", input[inputIndex + i].country);
+        }
+
+        // Satırı ekrana bas
+        printf("%-25s | %-30s | %-25s\n", out_str, heap_str, in_str);
+    }
+    printf("--------------------------|--------------------------------|--------------------------\n\n");
+    getchar();
+
+
+}
+ #pragma endregion
+
  #pragma region Sort
 
- void Visualized_RSS_Countries(Country unsorted[], int country_number, Country sorted_output[]) {
+ void Visualized_RSS_Countries(Country unsorted[], int country_number, Country output[]) {
     if (country_number == 0) return;
     CountryNode heap[HEAP_MAX];
     int inputIndex = 0, outputIndex = 0;
     int current_print_run = 1;
 
-    printf("\n=== RSS STEP-BY-STEP: GENERATING RUNS ===\n");
-    printf("--- RUN 1 ---\n");
+    int heapSize;
+    if (country_number < HEAP_MAX) { //full HEAP_MAX almamak için tam uzunluğu bilmemiz gerekiyo, display etcez
+        heapSize = country_number;
+    } else {
+        heapSize = HEAP_MAX;
+    }
 
-    int heap_active_size = (country_number < HEAP_MAX) ? country_number : HEAP_MAX;
-
-    for (int i = 0; i < heap_active_size; i++) { 
+    for (int i = 0; i < heapSize; i++) { 
         heap[i].data = unsorted[inputIndex++];
         heap[i].run_number = 1;
     }
-    for (int i = (heap_active_size / 2) - 1; i >= 0; i--) {
-        heapify_country(heap, i, heap_active_size);
+    for (int i = (heapSize / 2) - 1; i >= 0; i--) {
+        heapify_country(heap, i, heapSize);
     }
+
 
     while (inputIndex < country_number) {
         CountryNode minNode = heap[0];
-        sorted_output[outputIndex++] = minNode.data;
+        output[outputIndex++] = minNode.data;
+    
 
-        // Run değiştiğinde ekrana başlık bas
-        if (minNode.run_number > current_print_run) {
-            current_print_run = minNode.run_number;
-            printf("\n--- RUN %d ---\n", current_print_run);
-        }
-        printf("- %s\n", minNode.data.country);
+        printf("%s --> OUTPUT         ", minNode.data.country);
 
         CountryNode newNode;
         newNode.data = unsorted[inputIndex++];
@@ -303,19 +363,19 @@ void insertProductToHeap(ProductNode heap[], ProductNode insertNode, int heapSiz
         }
 
         heap[0] = newNode;
-        heapify_country(heap, 0, heap_active_size);
+        heapify_country(heap, 0, heapSize);
+        printf("%s --> HEAP",newNode.data.country);
+        printRSS(unsorted,output,heap,inputIndex,outputIndex,country_number,heapSize);
     }
 
-    int size = heap_active_size;
+    int size = heapSize;
     while (size > 0) {
         CountryNode minNode = heap[0];
-        sorted_output[outputIndex++] = minNode.data;
+        output[outputIndex++] = minNode.data;
         
         if (minNode.run_number > current_print_run) {
             current_print_run = minNode.run_number;
-            printf("\n--- RUN %d ---\n", current_print_run);
         }
-        printf("- %s\n", minNode.data.country);
 
         heap[0] = heap[size - 1];
         size--;
@@ -324,14 +384,11 @@ void insertProductToHeap(ProductNode heap[], ProductNode insertNode, int heapSiz
     printf("\n");
 }
 
-// Ekrana Merge adımlarını yazdıran özel Merge
 void Visualized_Merge_Countries(Country array[], int num_elements) {
     if (num_elements <= 1) return;
     Country *temp = (Country *)malloc(num_elements * sizeof(Country));
     int fully_sorted = 0;
     int pass_number = 1;
-
-    printf("\n=== MERGE PHASE: COMBINING RUNS ===\n");
 
     while (!fully_sorted) {
         fully_sorted = 1;
@@ -459,64 +516,55 @@ void Merge_Runs_Cities(City array[], int num_elements) {
     bool sorted = false;
 
     while (!sorted) {
-        sorted = true; // Başlangıçta sıralı varsayıyoruz
-        int i = 0;
+        int i = 0;  sorted = true; // Başlangıçta sıralı varsayıyoruz
 
         while (i < num_elements) {
-            int start1 = i;
-            // 1. Run'ın sonunu bul (Alfabetik olarak bozulduğu yer)
-            while (i + 1 < num_elements && strcasecmp(array[i].city_name, array[i+1].city_name) <= 0) {
+            int start1 = i; //run1 başlangıcı
+            while (i + 1 < num_elements && strcasecmp(array[i].city_name, array[i+1].city_name) <= 0) {//1. Runın sonunu buluyo
                 i++;
             }
-            int end1 = i;
-            i++; // 2. Run'ın başlangıcına geç
+            int end1 = i; //run1 sonu
+            i++; 
 
-            if (i >= num_elements) break; // Birleşecek 2. Run kalmadıysa çık
+            if (i >= num_elements) break; // başka run yoksa
 
-            sorted = false; // Kırılma noktası bulduk, demek ki henüz tam sıralı değil
+            sorted = false; 
             int start2 = i;
-            // 2. Run'ın sonunu bul
-            while (i + 1 < num_elements && strcasecmp(array[i].city_name, array[i+1].city_name) <= 0) {
+            while (i + 1 < num_elements && strcasecmp(array[i].city_name, array[i+1].city_name) <= 0) {//Run2nin sonunu buluyo
                 i++;
             }
             int end2 = i;
             i++;
 
-            // Run 1 ve Run 2'yi temp dizisinde birleştir (Klasik Merge işlemi)
             int p1 = start1, p2 = start2, k = start1;
             while (p1 <= end1 && p2 <= end2) {
-                if (strcasecmp(array[p1].city_name, array[p2].city_name) <= 0) {
-                    temp[k++] = array[p1++];
-                } else {
-                    temp[k++] = array[p2++];
+                if (strcasecmp(array[p1].city_name, array[p2].city_name) <= 0) { //run1 < run2 ise run1deki tempe atılır, pointer ilerletilir
+                    temp[k] = array[p1]; k++; p1++;
+                } else { //run1 > run2 ise run2'deki tempe atılır
+                    temp[k] = array[p2]; k++; p2++;
                 }
             }
-            // Kalan elemanları ekle
-            while (p1 <= end1) temp[k++] = array[p1++];
-            while (p2 <= end2) temp[k++] = array[p2++];
+            while (p1 <= end1){ temp[k] = array[p1]; k++; p1++;} //en son runlarda kalan elemanları da atmak gerekiyomuş. evet eleman kalıyomuş
+            while (p2 <= end2){ temp[k] = array[p2]; k++; p2++;}
 
-            // Birleşmiş kısmı asıl diziye geri kopyala
-            for (int j = start1; j <= end2; j++) {
+            for (int j = start1; j <= end2; j++) { //tempi geri arraye atıyo
                 array[j] = temp[j];
             }
         }
     }
-    free(temp); // Belleği temizle
+    free(temp); // MALLOC YAPMIŞTIM
 }
 
-// --- PRODUCTS İÇİN RUN BİRLEŞTİRİCİ ---
 void Merge_Runs_Products(Product array[], int num_elements) {
     if (num_elements <= 1) return;
     Product *temp = (Product *)malloc(num_elements * sizeof(Product));
-    int fully_sorted = 0;
+    bool sorted = false;
 
-    while (!fully_sorted) {
-        fully_sorted = 1; 
-        int i = 0;
+    while (!sorted) {
+        sorted = true; int i = 0;
 
         while (i < num_elements) {
             int start1 = i;
-            // 1. Run'ın sonunu bul
             while (i + 1 < num_elements && strcasecmp(array[i].product_info.name, array[i+1].product_info.name) <= 0) {
                 i++;
             }
@@ -525,16 +573,14 @@ void Merge_Runs_Products(Product array[], int num_elements) {
 
             if (i >= num_elements) break;
 
-            fully_sorted = 0;
+            sorted = false;
             int start2 = i;
-            // 2. Run'ın sonunu bul
             while (i + 1 < num_elements && strcasecmp(array[i].product_info.name, array[i+1].product_info.name) <= 0) {
                 i++;
             }
             int end2 = i;
             i++;
 
-            // Run 1 ve Run 2'yi temp dizisinde birleştir
             int p1 = start1, p2 = start2, k = start1;
             while (p1 <= end1 && p2 <= end2) {
                 if (strcasecmp(array[p1].product_info.name, array[p2].product_info.name) <= 0) {
@@ -546,7 +592,6 @@ void Merge_Runs_Products(Product array[], int num_elements) {
             while (p1 <= end1) temp[k++] = array[p1++];
             while (p2 <= end2) temp[k++] = array[p2++];
 
-            // Asıl diziye geri kopyala
             for (int j = start1; j <= end2; j++) {
                 array[j] = temp[j];
             }
@@ -555,91 +600,55 @@ void Merge_Runs_Products(Product array[], int num_elements) {
     free(temp);
 }
 
-void Build_All_Indexes(Country countriesUnordered[], int country_number, City_Index city_index[], Product_Index product_index[]) {
+void SortAndIndex(Country countriesUnordered[], int country_number, City_Index city_index[], Product_Index product_index[]) {
     
     for (int i = 0; i < country_number; i++) {
-        int c_count = countriesUnordered[i].city_number;
-        if (c_count == 0) {
-            countriesUnordered[i].offset_CityIndex = -1;
-            continue; // Bu ülkenin şehri yoksa atla
-        }
+        int city_number = countriesUnordered[i].city_number;
 
-        // 1. Bu ülkenin şehirlerini RSS ile sırala
-        City sorted_cities[c_count];
-        RSS_City(countriesUnordered[i].cities, c_count, sorted_cities);
-        Merge_Runs_Cities(sorted_cities, c_count);
+        City sorted_cities[city_number];
+        RSS_City(countriesUnordered[i].cities, city_number, sorted_cities);//C'de metoda array atınca kendi değerini değiştiriyomuş(Pass by Reference). Gemini javada da aynısı olduğunu iddia ediyo.Yersen.
+        Merge_Runs_Cities(sorted_cities, city_number);
 
         // Ülkenin ilk şehrinin offset'ini belirle
-        countriesUnordered[i].offset_CityIndex = global_city_count;
+        countriesUnordered[i].offset_CityIndex = allCity_number; //Country'nin offset_CityIndex'i
 
-        // 2. Sıralanmış şehirleri city_index'e kaydet
-        for (int j = 0; j < c_count; j++) {
-            int current_c_idx = global_city_count;
+        for (int j = 0; j < city_number; j++) { //şehirleri City_Index'e kaydedicez
+            int current_c_idx = allCity_number;
             
             city_index[current_c_idx].self_index = current_c_idx;
             city_index[current_c_idx].city = sorted_cities[j];
             
-            // Eğer son şehirse pointer -1 olur, değilse bir sonrakini gösterir
-            city_index[current_c_idx].next_city_index = (j == c_count - 1) ? -1 : current_c_idx + 1;
+            if (j == city_number - 1) {city_index[current_c_idx].next_city_index = -1;} //son şehirse next_city_index -1 olur
+            else {city_index[current_c_idx].next_city_index = current_c_idx + 1;}
 
-            // --- ŞİMDİ BU ŞEHRİN ÜRÜNLERİNE GEÇİYORUZ ---
-            int p_count = sorted_cities[j].product_number;
-            
-            if (p_count == 0) {
-                city_index[current_c_idx].product_index = -1;
-            } else {
-                // Şehrin ilk ürününün offset'ini belirle
-                city_index[current_c_idx].product_index = global_product_count;
+            int product_number = sorted_cities[j].product_number;
+           
+            city_index[current_c_idx].product_index = allProduct_number; //Citynin product_index'i
 
-                // 3. Bu şehrin ürünlerini RSS ile sırala
-                Product sorted_products[p_count];
-                RSS_Product(sorted_cities[j].products, p_count, sorted_products);
-                Merge_Runs_Products(sorted_products, p_count);
+            Product sorted_products[product_number];
+            RSS_Product(sorted_cities[j].products, product_number, sorted_products);
+            Merge_Runs_Products(sorted_products, product_number);
 
-                // 4. Sıralanmış ürünleri product_index'e kaydet
-                for (int k = 0; k < p_count; k++) {
-                    int current_p_idx = global_product_count;
+            for (int k = 0; k < product_number; k++) { //ürünleri product_indexe kaydetcez
+                int current_p_idx = allProduct_number;
                     
-                    product_index[current_p_idx].self_index = current_p_idx;
-                    product_index[current_p_idx].product = sorted_products[k];
+                product_index[current_p_idx].self_index = current_p_idx;
+                product_index[current_p_idx].product = sorted_products[k];
                     
-                    // Eğer son ürünse pointer -1 olur, değilse bir sonrakini gösterir
-                    product_index[current_p_idx].product_offset = (k == p_count - 1) ? -1 : current_p_idx + 1;
+                if (k == product_number - 1) {product_index[current_p_idx].product_offset = -1;} //son ürünse product_offset -1 olur
+                else {product_index[current_p_idx].product_offset = current_p_idx + 1;}
                     
-                    // NOT: Eğer .dat dosyasındaki yerini (ftell) kaydetmek istersen 
-                    // onu da Product struct'ının içine geçici ekleyip buraya taşıyabilirsin.
-                    product_index[current_p_idx].dat_offset = 0; 
+                product_index[current_p_idx].dat_offset = 0; //product_indexteki değil, productın kendisindeki dat_offseti kullanmaya karar verdim, ama bu dursun
                     
-                    global_product_count++; // Sonraki boş ürün slotuna geç
-                }
+                allProduct_number++;   
             }
-            global_city_count++; // Sonraki boş şehir slotuna geç
+            allCity_number++; 
         }
     }
 }
 
 #pragma endregion
 
-#pragma region Prints
-void printProductWithHeading(Product *p){
-  printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-20s %s\n", "NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
-  
-  printf("%-16s %-16s %-5d %-4s %-16s %-16s %-9s %-6d %-20s %-20s %s\n",
-    p->product_info.name, p->product_info.brand, p->pricing.price, p->pricing.currency,p->product_info.category,p->product_id,p->inventory.warehouse,p->inventory.stock,p->isbn,p->description,p->extra);
- }
-
- void printProduct(Product p){
-  printf("%-16s %-16s %-5d %-5s %-16s %-16s %-6d %-6s %-20s %-10s",
-    p.product_info.name,p.product_info.brand,p.pricing.price,p.pricing.currency,p.product_info.category,p.product_id,p.inventory.warehouse,p.inventory.stock,p.isbn,p.description,p.extra);
- }
-
- void printAllProducts(City city){
-  printf("%-16s %-16s %-10s %-16s %-16s %-16s %-20s %-10s %s\n","NAME", "BRAND", "PRICING", "CATEGORY", "ID", "INVENTORY", "ISBN", "DESCRIPTION", "EXTRA");
-  for (int i = 0; i < city.product_number; i++){
-    printProduct(city.products[i]);
-  }
- }
- #pragma endregion
   
 
 int main(int argc, char* argv){
@@ -729,8 +738,6 @@ int main(int argc, char* argv){
   } fclose(datFile); json_object_put(parsed_json);
   #pragma endregion
   
-  
-
   #pragma region Sort
 
   City_Index city_index[100];
@@ -751,17 +758,9 @@ int main(int argc, char* argv){
             }
         }
     }
-  Build_All_Indexes(countries, country_number, city_index, product_index);
+  SortAndIndex(countries, country_number, city_index, product_index);
 
   #pragma endregion
-
-
-
-
-
-
-
-
 
     while(true){ //main menu döngüsü
       printf("1.Search by Country/City/Product\n2.Sort and Display Index Levels\n3.Insert a New Product\n4.Apply Replacement Selection Sort\n5.Exit\n");
@@ -948,7 +947,7 @@ int main(int argc, char* argv){
         scanf("%s", newProduct.product_id); 
         
         // 4. Yeni Ürünü Dizinin En Sonuna Ekle
-        int new_p_idx = global_product_count; 
+        int new_p_idx = allProduct_number; 
         
         product_index[new_p_idx].self_index = new_p_idx;
         product_index[new_p_idx].product = newProduct;
@@ -978,19 +977,17 @@ int main(int argc, char* argv){
 
         // Sayaçları Güncelle
         city_index[target_city_offset].city.product_number++; 
-        global_product_count++; 
+        allProduct_number++; 
         
         printf("\nProduct '%s' successfully inserted in alphabetical order!\n", newProduct.product_info.name);
 
       }
 
       else if(menu == 4){ //apply replacement selection sort
-        printf("\nStarting Step-by-Step Replacement Selection Sort on Countries...\n");
             
-            // 1. Aşama: Run'ları oluştur ve ekrana bas
             Visualized_RSS_Countries(countriesUnordered, country_number, countries);
+            printf("Runs are built properly. Merge starts...\n");
             
-            // 2. Aşama: Run'ları birleştir ve ekrana bas
             Visualized_Merge_Countries(countries, country_number);
             
             // Sonucu doğrulamak için (İsteğe bağlı)
